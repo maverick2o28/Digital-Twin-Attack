@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Digital Twin — Network Threat Monitor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=Exo+2:wght@300;400;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<!-- ─── SCAN LINES OVERLAY ─── -->
+<div class="scanlines"></div>
+<div class="noise-overlay"></div>
+
+<!-- ─── HEADER ─── -->
+<header class="site-header">
+  <div class="header-left">
+    <div class="logo-mark">
+      <span class="logo-hex">⬡</span>
+      <div class="logo-text">
+        <span class="logo-title">DIGITAL TWIN</span>
+        <span class="logo-sub">NETWORK THREAT MONITOR v2.4</span>
+      </div>
+    </div>
+  </div>
+  <div class="header-center">
+    <div class="status-pill" id="network-status-pill">
+      <span class="status-dot" id="status-dot"></span>
+      <span id="status-label">INITIALIZING…</span>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="hw-indicators">
+      <div class="hw-led" id="hw-green" title="Normal"></div>
+      <div class="hw-led yellow" id="hw-yellow" title="Warning"></div>
+      <div class="hw-led red" id="hw-red" title="Attack"></div>
+      <span class="hw-label">RPi GPIO</span>
+    </div>
+    <div class="clock" id="clock">00:00:00</div>
+    <div class="db-status-badge" id="db-badge" title="MongoDB connection status">
+      <span class="db-dot" id="db-dot"></span>
+      <span class="db-badge-label">MONGO</span>
+    </div>
+  </div>
+</header>
+
+<!-- ─── DB EXPLORER MODAL ─── -->
+<div class="db-modal hidden" id="db-modal">
+  <div class="db-modal-box">
+    <div class="db-modal-header">
+      <span class="db-modal-title">&#128451; MONGODB EXPLORER &mdash; digital_twin</span>
+      <button class="db-modal-close" onclick="closeDbModal()">&#10005;</button>
+    </div>
+    <div class="db-tabs">
+      <button class="db-tab active" data-tab="overview" onclick="switchDbTab('overview')">OVERVIEW</button>
+      <button class="db-tab" data-tab="logs"     onclick="switchDbTab('logs')">LOGS</button>
+      <button class="db-tab" data-tab="sessions" onclick="switchDbTab('sessions')">SESSIONS</button>
+      <button class="db-tab" data-tab="alerts"   onclick="switchDbTab('alerts')">ALERTS</button>
+      <button class="db-tab" data-tab="blocked"  onclick="switchDbTab('blocked')">BLOCKED IPs</button>
+    </div>
+    <div class="db-tab-content" id="db-tab-overview">
+      <div id="db-overview-content"><div class="db-loading">Loading database stats&#8230;</div></div>
+    </div>
+    <div class="db-tab-content hidden" id="db-tab-logs">
+      <div class="db-query-bar">
+        <select id="db-log-level" class="db-select">
+          <option value="">ALL LEVELS</option>
+          <option value="CRITICAL">CRITICAL</option>
+          <option value="WARNING">WARNING</option>
+          <option value="INFO">INFO</option>
+          <option value="DEBUG">DEBUG</option>
+        </select>
+        <input class="db-input" id="db-log-ip" placeholder="Filter SRC IP..." />
+        <select id="db-log-since" class="db-select">
+          <option value="">ALL TIME</option>
+          <option value="5">LAST 5 MIN</option>
+          <option value="60">LAST HOUR</option>
+          <option value="1440">LAST 24H</option>
+        </select>
+        <button class="db-query-btn" onclick="fetchDbLogs()">QUERY</button>
+      </div>
+      <div class="db-table-wrap" id="db-logs-table"></div>
+    </div>
+    <div class="db-tab-content hidden" id="db-tab-sessions">
+      <div class="db-table-wrap" id="db-sessions-table"></div>
+    </div>
+    <div class="db-tab-content hidden" id="db-tab-alerts">
+      <div class="db-table-wrap" id="db-alerts-table"></div>
+    </div>
+    <div class="db-tab-content hidden" id="db-tab-blocked">
+      <div class="db-table-wrap" id="db-blocked-table"></div>
+    </div>
+    <div class="db-modal-footer">
+      <button class="db-danger-btn" onclick="confirmDbReset()">CLEAR ALL DATA</button>
+      <span class="db-footer-note" id="db-footer-note"></span>
+    </div>
+  </div>
+</div>
+
+<!-- ─── MAIN GRID ─── -->
+<main class="grid-layout">
+
+  <!-- ── STAT CARDS ── -->
+  <section class="stats-row">
+    <div class="stat-card">
+      <div class="stat-label">PACKETS ANALYZED</div>
+      <div class="stat-value mono" id="stat-packets">0</div>
+      <div class="stat-bar"><div class="stat-bar-fill" id="bar-packets"></div></div>
+    </div>
+    <div class="stat-card danger">
+      <div class="stat-label">THREATS DETECTED</div>
+      <div class="stat-value mono" id="stat-threats">0</div>
+      <div class="stat-bar"><div class="stat-bar-fill red" id="bar-threats"></div></div>
+    </div>
+    <div class="stat-card warn">
+      <div class="stat-label">BLOCKED IPs</div>
+      <div class="stat-value mono" id="stat-blocked">0</div>
+      <div class="stat-bar"><div class="stat-bar-fill yellow" id="bar-blocked"></div></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">DEFENSE MODE</div>
+      <div class="stat-value mono" id="stat-defense">ACTIVE</div>
+      <div class="stat-bar"><div class="stat-bar-fill green" style="width:100%"></div></div>
+    </div>
+  </section>
+
+  <!-- ── LEFT: NETWORK LOG ── -->
+  <section class="panel log-panel">
+    <div class="panel-header">
+      <span class="panel-title">⬡ LIVE NETWORK LOG</span>
+      <div class="panel-controls">
+        <button class="ctrl-btn" id="btn-pause-log" onclick="toggleLogPause()">⏸ PAUSE</button>
+        <button class="ctrl-btn" id="btn-clear-log" onclick="clearLog()">✕ CLEAR</button>
+      </div>
+    </div>
+    <div class="log-table-header">
+      <span>TIME</span>
+      <span>LEVEL</span>
+      <span>SRC IP</span>
+      <span>PORT</span>
+      <span>PROTO</span>
+      <span>EVENT</span>
+    </div>
+    <div class="log-scroll" id="log-container"></div>
+  </section>
+
+  <!-- ── RIGHT COLUMN ── -->
+  <aside class="right-column">
+
+    <!-- Attack Control Panel -->
+    <div class="panel control-panel">
+      <div class="panel-header">
+        <span class="panel-title">⚡ ATTACK SIMULATION</span>
+      </div>
+      <div class="attack-grid" id="attack-grid">
+        <button class="attack-btn" data-attack="syn_flood"
+                onclick="launchAttack('syn_flood')">
+          <span class="atk-icon">⟳</span>
+          <span class="atk-name">SYN FLOOD</span>
+          <span class="atk-sev critical">CRITICAL</span>
+        </button>
+        <button class="attack-btn" data-attack="arp_spoofing"
+                onclick="launchAttack('arp_spoofing')">
+          <span class="atk-icon">⥃</span>
+          <span class="atk-name">ARP SPOOF</span>
+          <span class="atk-sev high">HIGH</span>
+        </button>
+        <button class="attack-btn" data-attack="port_scan"
+                onclick="launchAttack('port_scan')">
+          <span class="atk-icon">◈</span>
+          <span class="atk-name">PORT SCAN</span>
+          <span class="atk-sev med">MEDIUM</span>
+        </button>
+        <button class="attack-btn" data-attack="brute_force"
+                onclick="launchAttack('brute_force')">
+          <span class="atk-icon">⌨</span>
+          <span class="atk-name">BRUTE FORCE</span>
+          <span class="atk-sev high">HIGH</span>
+        </button>
+        <button class="attack-btn" data-attack="dns_amplification"
+                onclick="launchAttack('dns_amplification')">
+          <span class="atk-icon">⊕</span>
+          <span class="atk-name">DNS AMP</span>
+          <span class="atk-sev critical">CRITICAL</span>
+        </button>
+      </div>
+      <div class="attack-actions">
+        <button class="action-btn stop-btn" id="btn-stop" onclick="stopAttack()" disabled>
+          ■ STOP ATTACK
+        </button>
+        <button class="action-btn reset-btn" onclick="resetAll()">
+          ↺ RESET ALL
+        </button>
+      </div>
+    </div>
+
+    <!-- Attack Status Banner -->
+    <div class="attack-banner hidden" id="attack-banner">
+      <div class="banner-inner">
+        <div class="banner-title">⚠ ATTACK IN PROGRESS</div>
+        <div class="banner-name" id="banner-name">—</div>
+        <div class="banner-progress">
+          <div class="progress-bar" id="attack-progress"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Traffic Chart -->
+    <div class="panel chart-panel">
+      <div class="panel-header">
+        <span class="panel-title">📈 TRAFFIC RATE (pkt/s)</span>
+      </div>
+      <canvas id="traffic-chart" width="320" height="140"></canvas>
+    </div>
+
+    <!-- Topology Map -->
+    <div class="panel topo-panel">
+      <div class="panel-header">
+        <span class="panel-title">🌐 NETWORK TOPOLOGY</span>
+      </div>
+      <canvas id="topo-canvas" width="320" height="180"></canvas>
+    </div>
+
+  </aside>
+
+</main>
+
+<!-- ─── ALERT OVERLAY ─── -->
+<div class="alert-overlay hidden" id="alert-overlay">
+  <div class="alert-box">
+    <div class="alert-header">
+      <span class="alert-icon">⚠</span>
+      <span class="alert-type" id="alert-type">ATTACK DETECTED</span>
+    </div>
+    <div class="alert-msg" id="alert-msg"></div>
+    <button class="alert-close" onclick="dismissAlert()">ACKNOWLEDGE</button>
+  </div>
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

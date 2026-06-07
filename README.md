@@ -31,11 +31,6 @@ A full-stack IT security lab project simulating **digital twin** network attack 
 
 ## Abstract
 
-This project demonstrates the use of a **digital twin** as a real-time replica of a physical system within a simulated small business environment. A Raspberry Pi Zero 2W functions as an edge IoT device by transmitting data to a centralized dashboard that visualizes a network of virtualized office servers and services.
-
-The project further explores how cyberattacks targeting IoT devices and data flows can manipulate the digital twin, resulting in inaccurate system representations and potential real-world consequences. This simulation highlights key challenges at the intersection of IoT, cybersecurity, and digital twin technology — with a focus on both vulnerabilities and defensive strategies.
-
-All network events, attack sessions, IDS alerts, and blocked IPs are persisted in a local **MongoDB** database and viewable through the built-in DB Explorer panel in the web dashboard.
 
 
 ## Project Structure

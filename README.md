@@ -1,21 +1,11 @@
 # Digital Twin SOC Simulation
-### 
 
-A full-stack IT security lab project simulating **digital twin** network attack and defense scenarios with real-time web UI, live log streaming, physical hardware indicators on a Raspberry Pi 2W, and persistent MongoDB logging.
+## System Overview
+
 
 ## Table of Contents
 
-1. [Abstract](#abstract)
-2. [Project Structure](#project-structure)
+1. [Introduction]()
+2. [Project Structure]()
 
-
-## Abstract
-
-
-
-## Project Structure
-
-```
-
-```
-
+## Introduction
